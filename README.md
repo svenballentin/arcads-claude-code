@@ -1,14 +1,14 @@
-# kie.ai AI Video — Agent Skill Pack
+# Claude Marketing Agent
 
-Create AI marketing videos and images using your [kie.ai](https://kie.ai) account, powered by AI agents in **Claude Code** or **Cursor**. Supports Seedance 2.0, Sora 2, Sora 2 Pro, Veo 3 / 3.1, Kling 2.6 / 3.0, and Nano Banana 2 / Pro.
+AI marketing videos and images for [Layers](https://layersjournal.app), powered by [kie.ai](https://kie.ai) and driven by AI agents in **Claude Code** or **Cursor**. Supports Seedance 2.0, Sora 2, Sora 2 Pro, Veo 3 / 3.1, Kling 2.6 / 3.0, and Nano Banana 2 / Pro.
 
 ## Get started (5 minutes)
 
 ### 1. Clone this repo
 
 ```bash
-git clone <repo-url>
-cd arcads-claude-code
+git clone git@github.com:layers-ai/claude-marketing-agent.git
+cd claude-marketing-agent
 ```
 
 ### 2. Run setup
