@@ -288,29 +288,27 @@ This is the creative core. Using the analysis from step 3:
 - If source > 15s: split into clips, each ≤ 15s
 - Use dialogue word count to validate (see main SKILL.md duration table: ~2.5 words/sec)
 
-### Step 7: Dialogue confirmation gate
+### Step 7: Dialogue iteration gate
 
-**MANDATORY** for any clone with spoken dialogue. Follow the exact format from the
-main SKILL.md:
+**MANDATORY** for any clone with spoken dialogue. Follow the full iteration format
+from the main SKILL.md → *Script and dialogue → MANDATORY — dialogue iteration gate*.
 
-```
-📝 Dialogue script (please confirm before I generate)
-
-  1. [HOOK]    "adapted line matching original pattern"
-  2. [SHOW]    "adapted feature call-out for user's product"
-  3. [DEMO]    (silent beat — physical demonstration, no dialogue)
-  4. [VERDICT] "adapted closing line / CTA"
-
-Total spoken words: ~N  |  Target duration: Xs  |  Fits at natural pace: ✅/❌
-
-Approve this dialogue? (yes / edit / rewrite)
-```
+**Clone-ad specifics:**
+- Always present **3 variants per clip**, each grounded in a different adaptation
+  strategy vs the source: (A) literal beat-for-beat port, (B) structure-preserved
+  but re-hooked for the user's product, (C) tone-matched but restructured.
+- Every variant carries word count + duration estimate + tone tag (see main
+  SKILL.md rates: ~2.5 w/s German, ~2.8 w/s English, ~2.3 w/s Spanish/Italian).
+- Maintain a visible round log from round 2 onward.
+- Only advance on an explicit lock phrase (`lock A` / `ship B` / `final: <text>`).
+  Ambiguous approvals trigger a clarification.
+- After lock, show the final line once more with a ✅ banner before moving to the
+  voice source gate.
 
 **Rules:**
-- This gate is **separate** from the cost confirmation — both must be satisfied
-- Never assume approval from earlier confirmations (tone, analysis, cost)
-- If user says "edit" or proposes changes, revise and re-present until approved
-- Skip ONLY if the source video is entirely silent (no speech detected in step 2)
+- This gate is **separate** from the cost confirmation — both must be satisfied.
+- Never assume approval from earlier confirmations (tone, analysis, cost).
+- Skip ONLY if the source video is entirely silent (no speech detected in step 2).
 
 ### Step 8: Audio decision
 

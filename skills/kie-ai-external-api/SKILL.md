@@ -148,32 +148,71 @@ Before the first Nano Banana image call in a workflow, ask: *"Use default Nano B
 
 For any video that features a person speaking, **ask the user for the script** (the exact words the AI person should say). This is separate from the visual prompt — it's the dialogue.
 
-### MANDATORY — dialogue confirmation gate
+### MANDATORY — dialogue iteration gate
 
-Before generating **any** video that contains spoken dialogue, the agent MUST:
+Before generating **any** video that contains spoken dialogue, the agent MUST run the dialogue iteration gate. **Iteration is the default, not the exception** — text is free, video is expensive. The agent should expect 2–4 rounds of edits before the user locks.
 
-1. **Extract the dialogue lines from the full prompt** and show them to the user in a dedicated block, separate from the visual/cinematography description.
-2. **Present them as a clean, numbered list** with beat labels (hook / show / demo / verdict, or similar) and any silent beats clearly marked as `(silent beat — no dialogue)`.
-3. **Read the dialogue out loud in your head at a natural pace, time it against the target duration, and flag the total spoken word count** plus whether it comfortably fits.
-4. **Explicitly ask for dialogue approval** before moving on — e.g. "Approve this dialogue? (yes / edit / rewrite)". **Never assume approval from earlier confirmations** (tone, template, cost). Dialogue approval is its own gate.
-5. Only after the user types `yes` (or equivalent) may you proceed to the cost confirmation and then generation. If the user says "edit" or proposes changes, revise and re-present the numbered dialogue block until they approve.
+**Core rules:**
 
-**Presentation format (use this exact structure):**
+1. **Never present a single take.** Always show **3 labeled variants** (A / B / C) per dialogue line or per clip. Variants must actually differ — a different hook, a different register, a different structure. Not three versions of the same sentence with one word swapped.
+2. **Every variant carries timing metadata**: word count, estimated duration at natural pace, and a one-line tone tag. Use ~2.5 words/sec for German, ~2.8 words/sec for English, ~2.3 words/sec for Spanish/Italian as rough rates (adjust for the target language).
+3. **Flag duration fit**: if a variant exceeds the clip's target duration, say so explicitly and offer to bump the clip (Seedance supports up to 15s continuous; Sora 2 picks from 4/8/12/16/20s; Veo 3.1 auto ~8s).
+4. **Maintain a visible round log** in your response from round 2 onward. Users need to see what's been tried so they can pull back to an earlier variant.
+5. **Only advance on an explicit lock phrase**: `lock A` / `ship B` / `final: <custom text>` / `use A as-is`. Anything ambiguous ("looks good", "yes", "nice") triggers a clarification: *"Lock which variant — A, B, or C?"* **Never assume approval from earlier confirmations** (tone, template, cost). Dialogue lock is its own gate.
+6. **After lock, show the final line one more time with a ✅ banner** before proceeding to the next gate. This gives the user one last chance to catch something before cost/voice-source/fire gates kick in.
+
+**Round 1 format (opening take — use this exact structure):**
 
 ```
-📝 Dialogue script (please confirm before I generate)
+📝 Dialogue iteration — Clip 1 (target 7s, de-DE)
 
-  1. [HOOK]   "Bro. BRO. Look what just showed up."
-  2. [SHOW]   "The PAID SOCIAL stripe? Insane. Like, who greenlit this?"
-  3. [DEMO]   (silent beat — thumb brushing the suede, small nod)
-  4. [VERDICT] "I'm literally wearing these to the gym tomorrow. You guys have to see these in person."
+A — polished influencer
+   "Hi Babes! Heute zeig ich euch mein absolutes Glow-Up mit dieser Palette — damit seh' ich endlich aus wie—"
+   ~18 words · ~7s · cuts off for wrecking-ball beat ✅
 
-Total spoken words: ~28  |  Target duration: 15s  |  Fits at natural pace: ✅
+B — hook-forward
+   "Hey meine Loves, diese Palette hat mein ganzes Gesicht verändert — schaut, ich seh' jetzt aus wie—"
+   ~16 words · ~6s · stronger open
 
-Approve this dialogue? (yes / edit / rewrite)
+C — tutorial mode (shortest)
+   "Okay girls, drei Produkte, zwei Minuten, und ich sehe aus wie—"
+   ~11 words · ~4s · leaves more beats for the smash
+
+Pick one (`lock A` / `lock B` / `lock C`), mix ("B-open + A-close"), or redirect ("too formal", "drop the 'Babes'").
 ```
 
-This gate applies to **Seedance 2.0**, **Veo 3.1**, and **Sora 2** — any flow where the model speaks. Skip for silent flows (Kling 3.0 has no native speech; Nano Banana images).
+**Round 2+ format (after user feedback — always include the round log):**
+
+```
+📝 Dialogue iteration — Clip 1 (round 2)
+
+Round log:
+  R1 — A/B/C shown (polished / hook-forward / tutorial-mode)
+  R1 feedback — "B but without 'meine Loves', start with 'Babes'"
+
+B′ — revised
+   "Hey Babes, diese Palette hat mein ganzes Gesicht verändert — schaut, ich seh' jetzt aus wie—"
+   ~15 words · ~6s
+
+B″ — more energy
+   "Babes! Diese Palette. Mein Leben. Schaut mal, ich seh' jetzt aus wie—"
+   ~12 words · ~4.5s
+
+Lock one (`lock B'` / `lock B''`) or keep iterating.
+```
+
+**Lock confirmation format:**
+
+```
+✅ Clip 1 dialogue locked (de-DE)
+
+   "Hi Babes! Heute zeig ich euch mein absolutes Glow-Up mit dieser Palette — damit seh' ich endlich aus wie—"
+   ~18 words · ~7s
+
+Moving to next gate.
+```
+
+This gate applies to **Seedance 2.0**, **Veo 3.1**, and **Sora 2** — any flow where the model speaks. Skip for silent flows (Kling 3.0 has no native speech; Nano Banana images). For multi-clip ads, run the gate **per clip** (each clip locks independently before moving to the voice source gate).
 
 ### Model-specific notes
 
@@ -322,7 +361,7 @@ Details and checklist items: [prompting/prompt-library/nano-banana.md](prompting
 ## Execution checklist (agent)
 
 1. **Ask for script/dialogue:** If the output is a video with a person speaking, ask the user for the exact words. Count words to auto-select duration (see "Script length → video duration" above). If too long, offer to split. (Skip for Nano Banana image-only requests.)
-   - **MANDATORY dialogue confirmation gate (before cost / before generation):** Extract the dialogue lines from the drafted prompt and present them to the user as a dedicated, numbered block separate from the visual description. Follow the format in [Script and dialogue → MANDATORY dialogue confirmation gate](#mandatory--dialogue-confirmation-gate). Wait for explicit `yes` before moving on. This gate is separate from the cost confirmation — both must be satisfied.
+   - **MANDATORY dialogue iteration gate (before cost / before generation):** Present **3 labeled variants (A/B/C) per clip** with word count + duration estimate + tone tag. Iterate as many rounds as the user needs — show the round log from R2 onward. Only advance on an explicit lock phrase (`lock A` / `ship B` / `final: <text>`). Ambiguous approvals ("looks good", "yes") must trigger a clarification. Follow the format in [Script and dialogue → MANDATORY dialogue iteration gate](#mandatory--dialogue-iteration-gate). This gate is separate from the cost confirmation — both must be satisfied.
    - **MANDATORY voice source gate (Seedance 2.0 only, immediately after dialogue gate):** Ask per clip whether the voice is Inline / Path A (ElevenLabs voice clone via `reference_audio_urls[]`) / Path B (ElevenLabs direct ffmpeg mux on silent Seedance) / Path C (strict lip sync — not yet integrated, falls back to A). Follow the format in [MANDATORY — voice source gate](#mandatory--voice-source-gate-seedance-20-only). For Path A, collect the hosted HTTPS URL. For Path B, collect the local file path and flag the clip for post-mux. Wait for explicit choice per clip. Skip entirely for Veo 3.1, Sora 2, Kling, Nano Banana.
 2. **Nano Banana image model:** For image calls, confirm Nano Banana 2 (default) vs Nano Banana Pro per the section above. Skip if not an image call.
 3. **Ask for generation count:** Ask how many variations the user wants for this prompt. Default to 1.
