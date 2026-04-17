@@ -65,6 +65,13 @@ Create a new subfolder (e.g., `aesthetics/cinematic/`, `aesthetics/studio/`) and
 ### `examples/ugc-stills/`
 5 example UGC product selfie outputs showing the target quality — character + product + scene with skin realism and camera imperfections baked in. Use these as a visual reference for what the UGC pipeline produces.
 
+### `audio/`
+ElevenLabs voice clips (or any reference audio) for Seedance 2.0. Used as `reference_audio_urls[]` for voice cloning (Path A) or muxed onto silent Seedance video in post via `scripts/mux-audio.sh` (Path B).
+- Naming: `{character-slug}-{clip-purpose}.mp3` (e.g. `emma-makeup-chat.mp3`)
+- Per-character canonical voice: `<character-slug>-voice-ref.mp3` (5–15 s of clean speech)
+- Audio files are gitignored (`*.mp3`, `*.wav`, `*.m4a`, `*.flac`, `*.ogg`) — your voice clones stay local
+- See `audio/README.md` for format specs and hosting flow
+
 ## Supported formats
 
 JPEG, PNG, WebP. Shipped images are JPEG 85% for smaller repo size. For best results, upscale images below 1024px before hosting — on macOS: `sips -Z 1080 img.jpg`.

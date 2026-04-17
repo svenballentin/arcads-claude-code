@@ -171,9 +171,57 @@ This gate applies to **Seedance 2.0**, **Veo 3.1**, and **Sora 2** — any flow 
 ### Model-specific notes
 
 - For **Seedance 2.0**, **Veo 3.1**, and **Sora 2**: embed the dialogue in the `prompt` field using a `Dialogue: "..."` or `She speaks: "..."` pattern (these models generate speech from the text prompt).
-- For **Seedance 2.0** specifically: before generating, **always ask the user** whether to enable audio output (kie.ai Seedance exposes an `audio` / `audioEnabled` flag — see reference.md). Also ask whether they want to supply `reference_audio_urls[]` (e.g. a voice clip). The user hosts the audio file at a public HTTPS URL (same rules as images).
+- For **Seedance 2.0** specifically: after the dialogue gate, run the **Voice source gate** (see next section) to pick inline TTS vs ElevenLabs Path A vs Path B vs Path C per clip.
 - For **Kling 3.0**: no native speech output — silent only. If the user wants speech, redirect to Seedance 2.0, Veo 3.1, or Sora 2.
 - For **Nano Banana images**: no speech — these are still images. Speech is handled in the subsequent video generation step.
+
+## MANDATORY — voice source gate (Seedance 2.0 only)
+
+Immediately after the dialogue gate passes, run this gate. It picks **where the audio comes from** for each Seedance clip, independently per clip. This gate applies to Seedance 2.0 only — Veo 3.1 and Sora 2 currently only support inline prompt-driven speech, so for those models there is nothing to ask.
+
+The four options, in order of fidelity to the user's desired voice:
+
+| Path | How it works | Lip sync | Audio fidelity | When to use |
+|------|--------------|----------|----------------|-------------|
+| **Inline** | `audio: true`, dialogue in prompt. Seedance generates its own speech. | Auto | Generic | Default. User has no specific voice in mind. |
+| **A — Voice clone** | Upload ElevenLabs audio → host → pass via `reference_audio_urls[]`. Seedance regenerates speech *in that voice timbre*. `audio: true`. | Auto | Voice sounds like ElevenLabs, but wording/pacing/emotion may drift. | User wants a specific voice and lip sync matters. Face is focal point. |
+| **B — Direct mux** | Generate ElevenLabs audio. Seedance runs with `audio: false`. `scripts/mux-audio.sh` overlays the audio on the silent MP4 in post. | None (audio is external) | Bit-exact ElevenLabs | User wants exact audio, face is partially obscured (brush, hands, head turn, B-roll over VO). Cheapest to iterate. |
+| **C — Strict lip sync** | Generate ElevenLabs audio + silent Seedance clip → run an external lip-sync tool (Wav2Lip / HeyGen / Synclabs). | Tool-driven | Bit-exact ElevenLabs AND mouth sync | **Not yet scaffolded in this repo.** Tell the user, log the gap in `MASTER_CONTEXT.md` Changelog, and fall back to Path A. |
+
+### Gate format
+
+Present as a per-clip block. For a two-clip ad:
+
+```
+🎤 Voice source gate
+
+For each clip, pick one of: Inline / A / B / C.
+See SKILL.md → "Voice source gate" for details on the tradeoffs.
+
+  Clip 1 — [scene one-liner]         →  [ask: Inline / A / B / C]
+  Clip 2 — [scene one-liner]         →  [ask: Inline / A / B / C]
+
+Wait for explicit choice per clip before proceeding.
+```
+
+### If the user picks Path A or B
+
+Ask for the ElevenLabs audio file. Two sub-paths:
+
+1. **User already has the file:** ask them to save it to `references/audio/<character-slug>-<clip-purpose>.mp3`. For Path A, also ask them to host at a public HTTPS URL (use the host from `MASTER_CONTEXT.md` → Reference image hosting; audio uses the same host). For Path B, local file is sufficient.
+2. **User needs to generate it:** walk them through ElevenLabs briefly — pick a voice, paste the confirmed dialogue from the dialogue gate, export as mp3 (128 kbps for Path A references, 256 kbps+ for Path B finals), save to `references/audio/`.
+
+Then record in session state:
+- Path A: the hosted HTTPS URL → add to `input.reference_audio_urls` in the Seedance payload
+- Path B: the local file path + the Seedance `taskId` → post-mux step runs after Seedance completes
+
+### If the user picks Path C
+
+Tell them: "That needs an external lip-sync tool not yet integrated in this repo. Falling back to Path A — Seedance will use the voice timbre but generate its own speech." Append a dated note to `MASTER_CONTEXT.md` Changelog (Decision / What changed / Why) flagging the demand so a future skill can pick it up.
+
+### Per-character voice library
+
+When a character's voice is locked in, save the canonical `references/audio/<character-slug>-voice-ref.mp3` (5–15 s clean speech) and record the ElevenLabs voice ID in `MASTER_CONTEXT.md` → Voice library. Reuse the same ref across clips so the character's voice stays consistent.
 
 ## Script length → video duration (auto-select)
 
@@ -268,9 +316,10 @@ Details and checklist items: [prompting/prompt-library/nano-banana.md](prompting
 
 1. **Ask for script/dialogue:** If the output is a video with a person speaking, ask the user for the exact words. Count words to auto-select duration (see "Script length → video duration" above). If too long, offer to split. (Skip for Nano Banana image-only requests.)
    - **MANDATORY dialogue confirmation gate (before cost / before generation):** Extract the dialogue lines from the drafted prompt and present them to the user as a dedicated, numbered block separate from the visual description. Follow the format in [Script and dialogue → MANDATORY dialogue confirmation gate](#mandatory--dialogue-confirmation-gate). Wait for explicit `yes` before moving on. This gate is separate from the cost confirmation — both must be satisfied.
+   - **MANDATORY voice source gate (Seedance 2.0 only, immediately after dialogue gate):** Ask per clip whether the voice is Inline / Path A (ElevenLabs voice clone via `reference_audio_urls[]`) / Path B (ElevenLabs direct ffmpeg mux on silent Seedance) / Path C (strict lip sync — not yet integrated, falls back to A). Follow the format in [MANDATORY — voice source gate](#mandatory--voice-source-gate-seedance-20-only). For Path A, collect the hosted HTTPS URL. For Path B, collect the local file path and flag the clip for post-mux. Wait for explicit choice per clip. Skip entirely for Veo 3.1, Sora 2, Kling, Nano Banana.
 2. **Nano Banana image model:** For image calls, confirm Nano Banana 2 (default) vs Nano Banana Pro per the section above. Skip if not an image call.
 3. **Ask for generation count:** Ask how many variations the user wants for this prompt. Default to 1.
-4. **Show cost and get confirmation:** Calculate total cost from `MASTER_CONTEXT.md`. Present the breakdown to the user. **Do NOT proceed until they confirm.**
+4. **Show cost and get confirmation:** Calculate total cost from `MASTER_CONTEXT.md`. Present the breakdown to the user. Include any per-clip voice-source notes ("Clip 2: Path A — voice-clone ref at <host>" or "Clip 1: Path B — post-mux with ElevenLabs audio"). **Do NOT proceed until they confirm.**
 5. **Resolve reference image URLs:** Before composing the prompt, check the repo-root `references/` folder for relevant images: `references/influencers/` for person recreation, `references/products/` for product showcase, `references/aesthetics/` for style/mood. If the user hasn't provided an image but a relevant one exists in `references/`, offer to use it — but remind them it must be hosted at a public HTTPS URL before kie.ai can consume it. Follow the flow in [Reference images: hosting and public URLs](#reference-images-hosting-and-public-urls). For Veo, choose `generationType` per the section above.
 6. Compose JSON per [reference.md](reference.md):
    - **Seedance 2.0, Sora 2, Kling 3.0, Nano Banana:** `POST /api/v1/jobs/createTask` with `{"model": "<slug>", "input": {...}}`.
@@ -281,7 +330,8 @@ Details and checklist items: [prompting/prompt-library/nano-banana.md](prompting
 9. **Generated image QA:** For each **still image** produced in this turn (Nano Banana outputs), follow [Generated image QA](#generated-image-qa-mandatory): inspect the image; if defective, regenerate with a refined prompt until pass or **2 retries** are exhausted. Skip this step for video-only outputs with no still to review.
 10. **Present results:** Return the `resultUrls[]` from each task for **QA-passed** stills (or the best attempt after max retries, with a clear note). If multiple variations, present as a numbered list for comparison. Explain `failed` with moderation/validation hints when appropriate. For Nano Banana images used as starting frames, show the image and **wait for user approval** before proceeding to video generation.
     - **ALWAYS open the output folder** on the user's machine after saving generated files so they can immediately review: `open "<output_directory>"` (macOS). Save videos to `outputs/` with a descriptive subfolder (e.g. `outputs/seedance-tests/`, `outputs/clone-ad-tests/`). Result URLs from kie.ai eventually expire — download locally for anything you want to keep.
-11. **Stitch if split:** If the script was split into segments, offer to stitch the final videos together with `ffmpeg` and provide both the stitched file and individual segments.
+11. **Post-mux (Seedance + Path B only):** For every clip flagged as Path B in the voice source gate, run `scripts/mux-audio.sh <silent-seedance.mp4> <elevenlabs-audio.mp3> <output.mp4>` after the Seedance clip has been downloaded. The script muxes the ElevenLabs audio onto the silent video with `ffmpeg` (AAC re-encode, `-shortest`). The muxed file is the canonical deliverable for that clip — use it (not the raw silent Seedance output) for stitching and review.
+12. **Stitch if split:** If the script was split into segments, offer to stitch the final videos together with `ffmpeg` and provide both the stitched file and individual segments. For mixed-path ads (e.g. Clip 1 Path A, Clip 2 Path B), stitch using the Path-A Seedance output and the Path-B muxed output.
 
 ## Errors (user-facing)
 

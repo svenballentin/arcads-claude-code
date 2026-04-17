@@ -14,3 +14,10 @@ test-video-output/
 *.bmp
 *.tiff
 *.heic
+
+# Ignore audio files (ElevenLabs voice clones and refs — private, regenerable)
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg

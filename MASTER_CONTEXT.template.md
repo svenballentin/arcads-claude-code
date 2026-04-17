@@ -41,7 +41,7 @@ _Edit or replace with your real brand blocks (see `skills/kie-ai-external-api/pr
 
 ## Reference image hosting
 
-_Fill in your preferred host so the agent doesn't ask every time._
+_Fill in your preferred host so the agent doesn't ask every time. The audio host (for ElevenLabs voice clones) uses the same setup._
 
 - **Preferred host:** _(e.g. Imgur for quick tests, Cloudflare R2 for repeat use, Supabase for project-scoped uploads)_
 - **Base URL (if self-hosted):**
@@ -51,8 +51,17 @@ Drop reference images into `references/`:
 - `references/influencers/` — face/body photos to recreate as AI people
 - `references/products/` — product photos for showcase workflows
 - `references/aesthetics/` — mood boards, lighting references, style inspiration
+- `references/audio/` — ElevenLabs voice clips for Seedance 2.0 (Path A = voice clone via `reference_audio_urls[]`, Path B = silent Seedance + ffmpeg mux; see `skills/kie-ai-external-api/SKILL.md` → "Voice source gate")
 
-The agent checks this folder when composing prompts and will offer to use images from it — but **kie.ai needs a public HTTPS URL**, so you'll host them before firing. See `skills/kie-ai-external-api/SKILL.md` → "Reference images: hosting and public URLs" for the flow.
+The agent checks these folders when composing prompts and will offer to use files from them — but **kie.ai needs a public HTTPS URL** for anything sent to the API, so you'll host image/audio references before firing. See `skills/kie-ai-external-api/SKILL.md` → "Reference images: hosting and public URLs" for the flow.
+
+## Voice library (ElevenLabs)
+
+_Record each character's ElevenLabs voice ID here once so it stays consistent across sessions. The canonical voice reference clip lives at `references/audio/<character-slug>-voice-ref.mp3` (5–15 s of clean speech, reused as `reference_audio_urls[]` for Path A)._
+
+| Character slug | ElevenLabs voice ID | Language | Path default | Notes |
+|---|---|---|---|---|
+| _(fill in as you mint characters, e.g. `emma`)_ | | | A / B | |
 
 ## API learnings (universal)
 

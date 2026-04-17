@@ -124,6 +124,101 @@ If a generation is close but not right, adjust **one element at a time**:
 3. Product drifts between shots → add consistency constraint
 4. Motion is too stiff → add degree adverbs (slowly, casually, deliberately)
 
+## Voice source (ElevenLabs integration)
+
+After the dialogue is confirmed (see SKILL.md → dialogue gate), pick where the audio comes from. Seedance 2.0 is the only model in this repo with audio flexibility — all voice-source decisions happen here. Choose per clip.
+
+### Decision tree
+
+```
+Does the user care about a specific voice?
+├─ NO  → Inline TTS. audio: true, dialogue in prompt. Done.
+└─ YES → They have an ElevenLabs voice?
+         ├─ YES → Face clearly visible AND mouth sync matters?
+         │        ├─ YES → Path A (voice clone via reference_audio_urls[])
+         │        └─ NO  → Path B (silent Seedance + ffmpeg mux in post)
+         └─ NO  → Walk them through ElevenLabs briefly, then pick A or B
+```
+
+### Path A — voice clone via `reference_audio_urls[]`
+
+Upload the ElevenLabs mp3 to a public HTTPS URL. Pass the URL in the Seedance `input.reference_audio_urls` array. Seedance synthesizes new speech in that voice timbre, lip-synced to the generated face. Dialogue comes from the `prompt`, not the audio file.
+
+```json
+{
+  "model": "bytedance/seedance-2",
+  "input": {
+    "prompt": "Medium shot of Sarah in a sunny kitchen... She speaks: \"Ich vergleiche mich ständig. Layers hilft mir, wieder bei mir zu sein.\" ...",
+    "duration": 15,
+    "aspect_ratio": "9:16",
+    "resolution": "720p",
+    "audio": true,
+    "first_frame_url": "https://<host>/sarah-hero.jpg",
+    "reference_audio_urls": ["https://<host>/real-sarah-voice-ref.mp3"]
+  }
+}
+```
+
+ElevenLabs prep for Path A (timbre reference):
+- **Duration:** 5–15 seconds of clean speech
+- **Content:** neutral, mid-range emotional delivery in the target language. Avoid shouting, whispering, laughing — these contaminate the timbre extraction.
+- **Format:** 128 kbps mp3, 22050 Hz or 44100 Hz, mono
+- **Reuse:** save as `references/audio/<character-slug>-voice-ref.mp3` and reuse across clips for that character. Record the ElevenLabs voice ID in `MASTER_CONTEXT.md` → Voice library.
+
+Known limitations:
+- Pronunciation of non-English words (especially German umlauts and compound words) can drift away from the original.
+- Emotional beats in the ElevenLabs reference do NOT carry over — Seedance applies its own emotional contour based on the prompt.
+- Max 3 audio URLs per call.
+
+### Path B — silent Seedance + ffmpeg mux
+
+Generate the full ElevenLabs performance as a separate mp3. Fire Seedance with `audio: false` (or omit `audio`). After the silent MP4 is downloaded, run `scripts/mux-audio.sh` to overlay the audio.
+
+Seedance payload (silent):
+```json
+{
+  "model": "bytedance/seedance-2",
+  "input": {
+    "prompt": "Medium shot of Sarah in a sunny kitchen... She looks into camera with a warm, slightly weary smile...",
+    "duration": 15,
+    "aspect_ratio": "9:16",
+    "resolution": "720p",
+    "audio": false,
+    "first_frame_url": "https://<host>/sarah-hero.jpg"
+  }
+}
+```
+
+Post step:
+```bash
+./scripts/mux-audio.sh \
+  outputs/comparison-ad/clip2-silent.mp4 \
+  references/audio/real-sarah-layers-vo.mp3 \
+  outputs/comparison-ad/clip2-final.mp4
+```
+
+The muxed file is the canonical deliverable. Stitch from the muxed file, not the silent Seedance output.
+
+ElevenLabs prep for Path B (final audio):
+- **Duration:** exactly the Seedance clip length (or very close — `mux-audio.sh` uses `-shortest` to trim to whichever input is shorter)
+- **Content:** the full confirmed dialogue with natural pauses baked in
+- **Format:** 256 kbps+ mp3 or m4a; AAC re-encode happens automatically during mux
+- **Levels:** normalize to about -14 LUFS
+
+Best for:
+- Influencer doing makeup (brush covers mouth frequently)
+- Hands-on product demos (camera on hands, not face)
+- Voiceover over B-roll shots
+- Anything where face isn't the focal point during speech
+
+### Path C — strict lip sync (not yet integrated)
+
+The "best of both worlds" path: ElevenLabs audio with machine-aligned mouth movement via Wav2Lip / HeyGen / Synclabs. This repo does not currently wrap a lip-sync tool. If the user asks for C, tell them the gap exists, fall back to Path A, and append a dated note to `MASTER_CONTEXT.md` Changelog so a future skill can pick it up.
+
+### Mixed paths in the same ad
+
+Nothing stops you from running Clip 1 on Path B and Clip 2 on Path A. The execution checklist handles each clip's path independently — only Path-B clips go through the post-mux step. When stitching, use the muxed file for Path-B clips and the raw Seedance output for Path-A clips.
+
 ## Duration and dialogue
 
 Seedance 2.0 supports **4–15 seconds** (continuous, not an enum). Use the script word count to auto-select:
