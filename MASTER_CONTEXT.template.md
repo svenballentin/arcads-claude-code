@@ -41,11 +41,13 @@ _Edit or replace with your real brand blocks (see `skills/kie-ai-external-api/pr
 
 ## Reference image hosting
 
-_Fill in your preferred host so the agent doesn't ask every time. The audio host (for ElevenLabs voice clones) uses the same setup._
+_The repo ships a Supabase helper as the default host. Swap if you prefer another host._
 
-- **Preferred host:** _(e.g. Imgur for quick tests, Cloudflare R2 for repeat use, Supabase for project-scoped uploads)_
-- **Base URL (if self-hosted):**
-- **Public bucket name (if R2/S3/Supabase):**
+- **Preferred host:** Supabase Storage (default)
+- **Upload helper:** `./scripts/upload-to-supabase.sh <local-file> [remote-path] [bucket]` — reads creds from `.env`, prints public URL to stdout
+- **Credentials:** stored in `.env` as `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET` (see `.env.example`). **Never paste the service_role key into chat** — it goes into `.env` only.
+- **Default bucket name:** `claude-marketing-agent-assets` (override via 3rd arg to the helper or `SUPABASE_BUCKET` in `.env`)
+- **Bucket visibility:** must be Public — the helper probes the public URL and warns if it returns non-200.
 
 Drop reference images into `references/`:
 - `references/influencers/` — face/body photos to recreate as AI people

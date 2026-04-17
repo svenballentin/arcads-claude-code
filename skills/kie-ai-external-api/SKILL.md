@@ -71,13 +71,20 @@ kie.ai requires reference images (`first_frame_url`, `last_frame_url`, `referenc
 
 **When the user provides a local file path:**
 
-1. Tell them the image needs to be hosted at a public HTTPS URL before kie.ai can see it, and offer these options:
-   - **Imgur** (fastest, no account for single images): upload at [imgur.com](https://imgur.com/upload), copy the direct image link (`https://i.imgur.com/xxx.jpg`).
-   - **Supabase / Cloudflare R2 / AWS S3 / Backblaze B2** (own your hosting): upload once, paste the object's public URL.
-   - **GitHub raw** (small images only, ≤100 MB): commit to a public repo, use `https://raw.githubusercontent.com/...`.
-2. **Do NOT ever** suggest pasting the image as base64 in chat — kie.ai doesn't accept base64 anywhere in this repo's supported flows.
-3. Once the user gives you a URL, sanity-check it resolves (HEAD request; 200 OK and `Content-Type: image/*`). If it 403s or redirects to HTML, the URL is wrong (common Imgur gotcha: use `i.imgur.com/*.jpg`, not `imgur.com/*`).
-4. Validate the URL is **HTTPS** (not HTTP) and on the **public internet** (not `localhost`, `127.0.0.1`, or a private IP).
+1. Check `MASTER_CONTEXT.md` → Reference image hosting for a pre-configured host. If Supabase Storage is set up (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` + `SUPABASE_BUCKET` in `.env`), **upload directly via the helper**:
+   ```bash
+   URL=$(./scripts/upload-to-supabase.sh <local-file> [remote-path] [bucket])
+   ```
+   The helper reads creds from `.env`, uploads via Supabase Storage API, probes the resulting public URL, and prints the URL to stdout. Everything else goes to stderr, so the URL is safe to capture. Use the returned URL as `first_frame_url`, `image_input[]`, `reference_audio_urls[]`, etc.
+2. If no host is configured yet, walk the user through the options and offer to populate `MASTER_CONTEXT.md` once:
+   - **Supabase Storage** (recommended — handles images AND audio, repeat use). Setup in `.env.example`; upload via `./scripts/upload-to-supabase.sh`.
+   - **Imgur** (images only, fastest for one-off tests): upload at [imgur.com](https://imgur.com/upload), copy the direct link (`https://i.imgur.com/xxx.jpg`). Does NOT host audio.
+   - **Cloudflare R2 / AWS S3 / Backblaze B2** (own your hosting, scale-friendly): upload once, paste the object's public URL.
+   - **GitHub raw** (small public files only): commit to a public repo, use `https://raw.githubusercontent.com/...`.
+3. **Do NOT ever** suggest pasting the image as base64 in chat — kie.ai doesn't accept base64 anywhere in this repo's supported flows.
+4. **Never ask the user to paste the Supabase service_role key (or any API key) into chat.** It goes into `.env` only. If a key needs configuring, walk them through opening `.env` in their editor, not pasting it at you.
+5. Once a URL is resolved (whether from the helper or a manual paste), sanity-check it (HEAD request; 200 OK and `Content-Type: image/*` or `audio/*`). If it 403s or redirects to HTML, the URL is wrong (common Imgur gotcha: use `i.imgur.com/*.jpg`, not `imgur.com/*`).
+6. Validate the URL is **HTTPS** (not HTTP) and on the **public internet** (not `localhost`, `127.0.0.1`, or a private IP).
 
 **Generated assets** (returned by kie.ai in `resultUrls[]`) are already public URLs — you can pipe them straight into the next call as `first_frame_url` or `imageUrls[]` without re-hosting.
 
