@@ -63,9 +63,24 @@ AI models default to airbrushed, flawless skin which instantly reads as fake. Al
 - `faint undereye shadows`
 - `the kind of skin you see on a real person's unfiltered front camera`
 
-**Do NOT use:** acne, pimples, breakouts, blemishes, redness, or anything that sounds like a skin condition. The goal is "real person, not retouched" — not "person with skin problems."
+**Do NOT use (skin condition words):** acne, pimples, breakouts, blemishes, redness, or anything that sounds like a skin condition. The goal is "real person, not retouched" — not "person with skin problems."
+
+**Do NOT use (Google safety-filter triggers):** `bare skin`, `bare-faced`, `naked face`, `stripped of makeup`. These phrases trip Nano Banana's (Gemini's) sexual-content filter even when the intent is clearly cosmetic. The call fails with `failMsg: "image was filtered out because it violated Google's Generative AI Prohibited Use policy"` and you burn compute for nothing.
+
+**Use instead:** `no makeup`, `natural face`, `unmade face`, `without cosmetics`, `makeup-free`. Safe. Same meaning.
 
 Place these cues **inline with the character description**, not in the imperfection block. Example: `"...warm tan skin with visible pores, slight unevenness in skin tone, minor undereye shadows, a hint of shine on the nose and forehead from natural oils..."`
+
+### Gemini / Nano Banana filter gotchas (learned the hard way)
+
+Before calling `nano-banana-2` or `nano-banana-pro`, scan the prompt for these triggers:
+
+- **`bare skin` / `bare-faced` / `naked face`** — sexual-content filter. Use `no makeup` / `natural face`.
+- **Real-photo references of identifiable people in `image_input[]`** — likeness/consent filter. Common failure mode when combined with beauty/makeup contexts. If your first attempt fails with the Google policy error, **drop `image_input[]` entirely** and describe the character in text only. AI-generated stills from a previous Nano Banana call are generally safe to re-use as refs.
+- **`young` + fine-skin descriptors + makeup context** — minor-safety heuristics sometimes misfire. Use `adult woman in her 20s` or `woman in her mid-20s` explicitly.
+- **Branded palette / product likeness** — even with "no logos, no text" negatives, "CAIA palette" or similar named brands can trigger. Use `generic pink/nude palette` or describe the object abstractly.
+
+When a call returns `state: fail, failCode: 400, failMsg: "...Google's Generative AI Prohibited Use policy"`, log the trigger in `MASTER_CONTEXT.md` Changelog so the next session knows to avoid it.
 
 ### Negative cues (always include)
 
